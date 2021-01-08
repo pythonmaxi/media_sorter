@@ -80,7 +80,7 @@ class Window(QWidget):
         media_sort.sort_dir(src, dst,
                             overwrite=overwrite,
                             only_copy=only_copy,
-                            set_prc=lambda x: self._progress.setValue(x),
+                            set_prc=lambda x: self._progress.setValue(int(x)),
                             fld_fmt=fld_fmt)
         # %% Write values to configuration
         self._settings.setValue('src', src)

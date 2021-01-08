@@ -12,7 +12,7 @@ from PIL import Image, ExifTags
 
 DATE_FMT = '%Y:%m:%d %H:%M:%S'
 IMG_REGEX = r'.*\.(jpe?g|png|raw)$'
-VID_REGEX = r'.*\.(mp4|mov)$'
+MEDIA_REGEX = r'.*\.(mp4|mov|mkv|jpe?g|png|raw)$'
 
 
 # %% Function to get date from an image
@@ -32,18 +32,22 @@ def get_date(path):
 
     """
     assert os.path.exists(path), f'{path} does not exists'
-    if re.match(IMG_REGEX, path, re.I):
-        img = Image.open(path)
-        exif = {ExifTags.TAGS[t]: v for t,
-                v in img._getexif().items() if t in ExifTags.TAGS}
-        date = datetime.datetime.strptime(exif['DateTime'], DATE_FMT)
-    elif re.match(VID_REGEX, path, re.I):
-        ctime = os.stat(path).st_ctime
-        date = datetime.datetime.fromtimestamp(ctime)
-    else:
-        print(f'{path} is not supported')
-        date = None
-    return date
+    date = None
+    try:
+        if re.match(IMG_REGEX, path, re.I):
+            img = Image.open(path)
+            exif = {ExifTags.TAGS[t]: v for t,
+                    v in img._getexif().items() if t in ExifTags.TAGS}
+            date = datetime.datetime.strptime(exif['DateTime'], DATE_FMT)
+
+    finally:
+        if not re.match(MEDIA_REGEX, path, re.I):
+            print(f'{path} is not supported')
+        elif not date:
+            ctime = os.stat(path).st_ctime
+            date = datetime.datetime.fromtimestamp(ctime)
+
+        return date
 
 
 # %% Function to get all images in all subfolders of a directory
@@ -71,7 +75,7 @@ def get_all_media(path, ignore_dirs=[]):
         if os.path.isdir(abs_file) and abs_file not in ignore_dirs:
             images.extend(get_all_media(abs_file))
             # TBD: Set recursion limit
-        elif re.match(IMG_REGEX, file) or re.match(VID_REGEX, path):
+        elif re.match(MEDIA_REGEX, abs_file, re.I):
             images.append(abs_file)
     return images
 
@@ -97,7 +101,10 @@ def sort_media_list(media_list, folder_format='%Y_%m'):
     """
     out = {}
     for image in media_list:
-        date_str = get_date(image).strftime(folder_format)
+        date = get_date(image)
+        if not date:
+            continue
+        date_str = date.strftime(folder_format)
         if date_str not in out.keys():
             out[date_str] = []
         out[date_str].append(image)
@@ -193,4 +200,5 @@ def sort_dir(src, dst, overwrite=False, only_copy=True, ignore_dirs=[],
 
 # %% Run this if programm is called directly
 if __name__ == '__main__':
-    sort_dir('Source path', 'Destination path', overwrite=True)
+    sort_dir(r'C:\Users\HanneMarit\OneDrive\Desktop\bilder',
+             r'C:\Users\HanneMarit\OneDrive\Desktop\bilder_sortiert')
