@@ -174,6 +174,7 @@ def sort_dir(src, dst, overwrite=False, only_copy=True, ignore_dirs=[],
     sorted_dict = sort_media_list(im_list, folder_format=fld_fmt)
     im_count = len(im_list)
     im_processed = 0
+    failed = 0
     # %% Create folders if they don't exist
     for folder in sorted_dict:
         abs_path = os.path.join(dst, folder)
@@ -186,16 +187,21 @@ def sort_dir(src, dst, overwrite=False, only_copy=True, ignore_dirs=[],
             if new_path in moved:
                 new_path = un_duplicate(new_path, moved)
             moved.append(new_path)
-            if not overwrite and os.path.exists(new_path):
-                pass  # Simply do nothing since the counter should still go up
-            elif only_copy:
-                shutil.copy2(image, new_path)
-                # Use copy2 in attempt to copy metadata
-            else:
-                os.rename(image, new_path)
+            try:
+                if not overwrite and os.path.exists(new_path):
+                    pass  # Simply do nothing since the counter should still go up
+                elif only_copy:
+                    shutil.copy2(image, new_path)
+                    # Use copy2 in attempt to copy metadata
+                else:
+                    os.rename(image, new_path)
+            except OSError:
+                failed += 1
             im_processed += 1
             prc = im_processed / im_count * 100
             set_prc(prc)
+    if failed:
+        print(f'Failed to copy {failed} images')
 
 
 # %% Run this if programm is called directly
