@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-"""
+'''
 Created on Fri Jan  1 17:31:40 2021
 
 @author: prah_ch
-"""
+'''
 import datetime
 import shutil
 import os
@@ -17,7 +17,7 @@ MEDIA_REGEX = r'.*\.(mp4|mov|mkv|jpe?g|png|raw)$'
 
 # %% Function to get date from an image
 def get_date(path):
-    """
+    '''
     Get the date of an image or video
 
     Parameters
@@ -30,7 +30,7 @@ def get_date(path):
     date : datetime.datetime
         The creation time of the media file.
 
-    """
+    '''
     assert os.path.exists(path), f'{path} does not exists'
     date = None
     try:
@@ -52,7 +52,7 @@ def get_date(path):
 
 # %% Function to get all images in all subfolders of a directory
 def get_all_media(path, ignore_dirs=[]):
-    """
+    '''
     Search path recursively for videos and images
 
     Parameters
@@ -67,7 +67,7 @@ def get_all_media(path, ignore_dirs=[]):
     images : list
         List of absolute media paths.
 
-    """
+    '''
     dir_content = os.listdir(path)
     images = []
     for file in dir_content:
@@ -82,7 +82,7 @@ def get_all_media(path, ignore_dirs=[]):
 
 # %% Function to sort a list from get_all_media to a dictionary
 def sort_media_list(media_list, folder_format='%Y_%m'):
-    """
+    '''
     Sort media list created using get_all_media
 
     Parameters
@@ -98,7 +98,7 @@ def sort_media_list(media_list, folder_format='%Y_%m'):
     out : dict
         Sorted dictionary.
 
-    """
+    '''
     out = {}
     for image in media_list:
         date = get_date(image)
@@ -113,7 +113,7 @@ def sort_media_list(media_list, folder_format='%Y_%m'):
 
 # %% Function to prevent duplicate names
 def un_duplicate(name, used_names):
-    """
+    '''
     Un-Duplicate a filename
 
     Parameters
@@ -128,7 +128,7 @@ def un_duplicate(name, used_names):
     str
         New absolute path with un-duplicated name.
 
-    """
+    '''
     base_name = os.path.basename(name)
     cnt = 0
     for used in used_names:
@@ -140,8 +140,8 @@ def un_duplicate(name, used_names):
 
 # %% Function to copy/move sorted images
 def sort_dir(src, dst, overwrite=False, only_copy=True, ignore_dirs=[],
-             set_prc=lambda x: print(f'\rPercentage done: {x}', end=''), fld_fmt='%Y_%m'):
-    """
+             progress={}, fld_fmt='%Y_%m'):
+    '''
     Sort a directory
 
     Parameters
@@ -157,8 +157,8 @@ def sort_dir(src, dst, overwrite=False, only_copy=True, ignore_dirs=[],
         If false the source directory media will be only copied. The default is True.
     ignore_dirs : list, optional
         Directories to ignore. The default is [].
-    set_prc : function, optional
-        Function to set percentage.
+    progress : dict of functions, optional
+        Functions to set progress
     fld_fmt : str, optional
         New folder Format. The default is '%Y_%m'.
 
@@ -166,15 +166,27 @@ def sort_dir(src, dst, overwrite=False, only_copy=True, ignore_dirs=[],
     -------
     None.
 
-    """
+    '''
+    def _get_func(dic, name):
+        if name in dic:
+            return dic[name]
+        return lambda x: None
     assert src != dst, f'{src} and {dst} are the same'
     if src in dst:  # Check if dst is a subdir of src
         ignore_dirs.append(os.path.abspath(dst))
+
+    # %% Get media list
+    _get_func(progress, 'status')('Getting media list')
     im_list = get_all_media(src, ignore_dirs=ignore_dirs)
+
+    # %% Sort media list
+    _get_func(progress, 'status')('Sorting media by date')
     sorted_dict = sort_media_list(im_list, folder_format=fld_fmt)
+
     im_count = len(im_list)
     im_processed = 0
-    failed = 0
+    failed = []
+    _get_func(progress, 'status')('Writing changes to disc')
     # %% Create folders if they don't exist
     for folder in sorted_dict:
         abs_path = os.path.join(dst, folder)
@@ -182,26 +194,27 @@ def sort_dir(src, dst, overwrite=False, only_copy=True, ignore_dirs=[],
         if not os.path.exists(abs_path):
             os.mkdir(abs_path)
         # %% Move/copy images to folder
-        for image in sorted_dict[folder]:
-            new_path = os.path.join(dst, folder, os.path.basename(image))
+        for old_path in sorted_dict[folder]:
+            new_path = os.path.join(dst, folder, os.path.basename(old_path))
             if new_path in moved:
                 new_path = un_duplicate(new_path, moved)
             moved.append(new_path)
             try:
                 if not overwrite and os.path.exists(new_path):
-                    pass  # Simply do nothing since the counter should still go up
+                    pass  # Count up and do nothing
                 elif only_copy:
-                    shutil.copy2(image, new_path)
+                    shutil.copy2(old_path, new_path)
                     # Use copy2 in attempt to copy metadata
                 else:
-                    os.rename(image, new_path)
+                    os.rename(old_path, new_path)
             except OSError:
-                failed += 1
+                failed.append(old_path)
             im_processed += 1
-            prc = im_processed / im_count * 100
-            set_prc(prc)
+            _get_func(progress, 'percentage')(im_processed / im_count * 100)
+
     if failed:
-        print(f'Failed to copy {failed} images')
+        print(f'Failed to copy {len(failed)} images')
+    _get_func(progress, 'status')('Done')
 
 
 # %% Run this if programm is called directly

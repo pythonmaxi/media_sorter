@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-"""
+'''
 Created on Sat Jan  2 13:11:58 2021
 
 @author: prah_ch
-"""
+'''
 import sys
 import media_sort
 from PyQt5.QtGui import QDesktopServices
@@ -65,6 +65,9 @@ class Window(QWidget):
         self._progress.setValue(0)
         layout.addWidget(self._progress, 4, 0, 1, 3)
 
+        # %% The status bar
+        # TBD
+
         # %% Set window Title
         self.setWindowTitle('Media sorter')
 
@@ -93,11 +96,13 @@ class Window(QWidget):
         overwrite = self._overwrite.isChecked()
         only_copy = self._only_copy.isChecked()
         fld_fmt = self._fld_fmt.text()
+        progress = {
+            'percentage': lambda x: self._progress.setValue(x)
+        }
         media_sort.sort_dir(src, dst,
                             overwrite=overwrite,
                             only_copy=only_copy,
-                            set_prc=lambda x: self._progress.setValue(
-                                int(x)),
+                            progress=progress,
                             fld_fmt=fld_fmt)
         # %% Write values to configuration
         self._settings.setValue('src', src)
