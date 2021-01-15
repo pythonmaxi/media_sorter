@@ -8,9 +8,10 @@ import sys
 import media_sort
 from PyQt5.QtGui import QDesktopServices
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QGridLayout, \
-    QLabel, QLineEdit, QFileDialog, QCheckBox, QProgressBar
-from PyQt5.QtCore import QUrl, QSettings
-from threading import Thread
+    QLabel, QLineEdit, QFileDialog, QCheckBox, QProgressBar, QTextBrowser
+from PyQt5.QtCore import QUrl, QSettings, QThread, pyqtSlot
+
+Sorter = media_sort.Sorter()
 
 
 # %% Define the Main window
@@ -65,55 +66,69 @@ class Window(QWidget):
         self._progress.setValue(0)
         layout.addWidget(self._progress, 4, 0, 1, 3)
 
-        # %% The status bar
-        # TBD
+        # %% The status
+        self._status = QLabel('Doing Nothing...')
+        layout.addWidget(self._status, 5, 0, 1, 3)
 
         # %% Set window Title
         self.setWindowTitle('Media sorter')
 
         # %% Restore last used values
-        self._src_dir.setText(self._settings.value('src', ''))
-        self._dst_dir.setText(self._settings.value('dst', ''))
-        self._overwrite.setChecked(
-            self._settings.value('overwrite', False, type=bool))
-        self._only_copy.setChecked(
-            self._settings.value('onlyCopy', True, type=bool))
+        self._overwrite.setChecked(self._settings.value('overwrite',
+                                                        False, type=bool))
+        self._only_copy.setChecked(self._settings.value('onlyCopy',
+                                                        True, type=bool))
         self._fld_fmt.setText(self._settings.value('fldFmt', '%Y_%m'))
 
     def _get_dir(self, set_fn):
         directory = str(QFileDialog.getExistingDirectory())
         set_fn(directory)
 
+    @pyqtSlot()
     def _start_sort(self):
-        thread = Thread(target=self._sort_thread)
-        thread.start()
-
-    def _sort_thread(self):
         self._start.setEnabled(False)
         self._progress.setValue(0)
-        src = self._src_dir.text()
-        dst = self._dst_dir.text()
-        overwrite = self._overwrite.isChecked()
-        only_copy = self._only_copy.isChecked()
-        fld_fmt = self._fld_fmt.text()
-        progress = {
-            'percentage': lambda x: self._progress.setValue(x)
-        }
-        media_sort.sort_dir(src, dst,
-                            overwrite=overwrite,
-                            only_copy=only_copy,
-                            progress=progress,
-                            fld_fmt=fld_fmt)
-        # %% Write values to configuration
-        self._settings.setValue('src', src)
-        self._settings.setValue('dst', dst)
-        self._settings.setValue('overwrite', overwrite)
-        self._settings.setValue('onlyCopy', only_copy)
-        self._settings.setValue('fldFmt', fld_fmt)
+        Sorter.overwrite = self._overwrite.isChecked()
+        Sorter.only_copy = self._only_copy.isChecked()
+        Sorter.fld_fmt = self._fld_fmt.text()
+        Sorter.setPercentage = lambda x: self._progress.setValue(int(x))
+        Sorter.setStatus = lambda x: self._status.setText(str(x))
+        Sorter.src = self._src_dir.text()
+        Sorter.dst = self._dst_dir.text()
+        thread = SortThread(self)
+        thread.finished.connect(self._after_sort)
+        thread.start()
+
+    @pyqtSlot()
+    def _after_sort(self):
+        self._settings.setValue('overwrite', Sorter.overwrite)
+        self._settings.setValue('onlyCopy', Sorter.only_copy)
+        self._settings.setValue('fldFmt', Sorter.fld_fmt)
         self._start.setEnabled(True)
 
     def _open_link(self, link):
         QDesktopServices.openUrl(QUrl(link))
+
+
+class SortThread(QThread):
+    def __init__(self, parent):
+        QThread.__init__(self, parent)
+
+    def run(self):
+        Sorter.sort(Sorter.src, Sorter.dst)
+
+
+class Reports(QWidget):
+    def __init__(self):
+        super().__init__()
+        layout = QGridLayout()
+        self.setLayout(layout)
+        layout.addWidget(QLabel('Failed Media'), 0, 0)
+        text = QTextBrowser()
+        layout.addWidget(text, 1, 0)
+        report_failed = '\n'.join(Sorter.failed)
+        # TBD
+
 
 
 # %% Run this if programm is executed directly
