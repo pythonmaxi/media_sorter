@@ -23,6 +23,7 @@ class Sorter:
         self.fld_fmt = '%Y_%m'
         self.progress = {}
         self.ignore_paths = []
+        self.failed = []
 
     def setStatus(self, status):
         print('\nSTATUS: ' + status)
@@ -185,7 +186,6 @@ class Sorter:
 
         im_count = len(im_list)
         im_processed = 0
-        self.failed = []
         self.setStatus('Writing changes to disc')
         # %% Create folders if they don't exist
         for folder in sorted_dict:

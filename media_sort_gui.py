@@ -5,13 +5,16 @@ Created on Sat Jan  2 13:11:58 2021
 @author: prah_ch
 '''
 import sys
+import os
 import media_sort
-from PyQt5.QtGui import QDesktopServices
+from PyQt5.QtGui import QDesktopServices, QIcon
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QGridLayout, \
-    QLabel, QLineEdit, QFileDialog, QCheckBox, QProgressBar, QTextBrowser
+    QLabel, QLineEdit, QFileDialog, QCheckBox, QProgressBar, QTextBrowser, \
+    QMainWindow
 from PyQt5.QtCore import QUrl, QSettings, QThread, pyqtSlot
 
 Sorter = media_sort.Sorter()
+SCRIPT_FOLDER = os.path.dirname(__file__)
 
 
 # %% Define the Main window
@@ -66,13 +69,20 @@ class Window(QWidget):
         self._progress.setValue(0)
         layout.addWidget(self._progress, 4, 0, 1, 3)
 
-        # %% The status
+        # %% status, reports
         self._status = QLabel('Doing Nothing...')
-        layout.addWidget(self._status, 5, 0, 1, 3)
+        self._reports = QPushButton('Reports')
+        self._reports.setEnabled(False)
+        self._reports.clicked.connect(self._open_reports)
+        layout.addWidget(self._status, 5, 0, 1, 2)
+        layout.addWidget(self._reports, 5, 2)
+
 
         # %% Set window Title
         self.setWindowTitle('Media sorter')
 
+        # %% Set the icon
+        self.setWindowIcon(QIcon(os.path.join(SCRIPT_FOLDER, 'icon.svg')))
         # %% Restore last used values
         self._overwrite.setChecked(self._settings.value('overwrite',
                                                         False, type=bool))
@@ -87,6 +97,7 @@ class Window(QWidget):
     @pyqtSlot()
     def _start_sort(self):
         self._start.setEnabled(False)
+        self._reports.setEnabled(False)
         self._progress.setValue(0)
         Sorter.overwrite = self._overwrite.isChecked()
         Sorter.only_copy = self._only_copy.isChecked()
@@ -105,9 +116,16 @@ class Window(QWidget):
         self._settings.setValue('onlyCopy', Sorter.only_copy)
         self._settings.setValue('fldFmt', Sorter.fld_fmt)
         self._start.setEnabled(True)
+        self._reports.setEnabled(True)
 
     def _open_link(self, link):
         QDesktopServices.openUrl(QUrl(link))
+
+    def _open_reports(self):
+        window = QMainWindow(self)
+        reps = Reports()
+        window.setCentralWidget(reps)
+        window.show()
 
 
 class SortThread(QThread):
@@ -127,11 +145,11 @@ class Reports(QWidget):
         text = QTextBrowser()
         layout.addWidget(text, 1, 0)
         report_failed = '\n'.join(Sorter.failed)
-        # TBD
+        text.setText(report_failed)
 
 
 
-# %% Run this if programm is executed directly
+# %% Run this if program is executed directly
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     win = Window()
